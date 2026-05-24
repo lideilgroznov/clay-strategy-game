@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Пластилиновая Стратегия</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="mainMenu" class="screen menu-screen">
+        <div class="menu-art" aria-hidden="true">
+          <div class="iso-cube big-cube"></div>
+          <div class="smoke smoke-a"></div>
+          <div class="smoke smoke-b"></div>
+          <div class="smoke smoke-c"></div>
+        </div>
+        <h1>Пластилиновая Стратегия</h1>
+        <div class="menu-actions">
+          <button id="continueBtn" class="primary-btn hidden">Продолжить</button>
+          <button id="startBtn" class="primary-btn">Старт</button>
+          <button id="bestiaryBtn" class="secondary-btn">Бестиарий</button>
+          <button id="exitBtn" class="secondary-btn">Выход</button>
+        </div>
+      </section>
+
+      <section id="bestiaryScreen" class="screen bestiary-screen hidden">
+        <header class="panel-header">
+          <h2>Бестиарий</h2>
+          <div class="header-actions">
+            <button id="resetBestiaryBtn" class="secondary-btn small-btn">Сброс</button>
+            <button id="backMenuBtn" class="primary-btn small-btn">Назад</button>
+          </div>
+        </header>
+        <div id="bestiaryList" class="bestiary-list"></div>
+      </section>
+
+      <section id="gameScreen" class="screen game-screen hidden">
+        <div class="hud">
+          <div class="coin-box">
+            <span class="coin-mark"></span>
+            <span id="moneyValue">100</span>
+          </div>
+          <div id="waveTimer" class="timer-box">Атака через 60с</div>
+          <div class="zoom-box">
+            <button id="zoomOutBtn" class="secondary-btn icon-btn">-</button>
+            <span id="zoomValue">100%</span>
+            <button id="zoomInBtn" class="secondary-btn icon-btn">+</button>
+          </div>
+          <button id="gameMenuBtn" class="secondary-btn small-btn">Меню</button>
+        </div>
+
+        <div id="world" class="world">
+          <div id="camera" class="camera">
+            <div id="grid" class="grid"></div>
+            <div id="roads" class="roads"></div>
+            <div id="rangeLayer" class="range-layer"></div>
+            <div id="entities" class="entities"></div>
+            <div id="effects" class="effects"></div>
+            <div id="radialMenu" class="radial-menu hidden"></div>
+          </div>
+          <div id="selectionBox" class="selection-box hidden"></div>
+          <div id="ghost" class="building-ghost hidden"></div>
+        </div>
+
+        <div id="messageLog" class="message-log">Кликни по кубику, чтобы открыть действия.</div>
+      </section>
+    </main>
+
+    <script src="./game.js"></script>
+  </body>
+</html>
