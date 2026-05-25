@@ -11,14 +11,44 @@ const BESTIARY_DEFAULTS = {
 };
 
 const STORAGE_KEY = "clay_strategy_bestiary_v3";
+const SOUND_SETTINGS_KEY = "clay_strategy_sound_settings_v1";
+const SOUND_DB_NAME = "clay_strategy_sound_files";
+const SOUND_DB_STORE = "sounds";
 const WORLD_LIMITS = { minX: -320, maxX: 3200, minY: 50, maxY: 980 };
 const SOUND_DEFS = {
   bow: { src: "assets/sound-bow.mp3", volume: 0.72, duration: 0.9 },
+  towerShot: { src: "assets/sound-bow.mp3", volume: 0.72, duration: 0.9 },
   melee: { src: "assets/sound-melee.mp3", volume: 0.6, duration: 0.65 },
   build: { src: "assets/sound-build.mp3", volume: 0.56, duration: 0.7 },
   pickaxe: { src: "assets/sound-pickaxe.mp3", volume: 0.46, duration: 0.34 },
   death: { src: "assets/sound-death.mp3", volume: 0.55, duration: 0.55 },
   buildingBreak: { src: "assets/sound-building-break.mp3", volume: 0.68, duration: 0.72 },
+  music: { src: null, volume: 0.36, duration: 0 },
+};
+const UNIT_SOUND_CONTROLS = {
+  worker: [{ key: "pickaxe", label: "Звук добывания руды (рабочий)" }],
+  soldier: [
+    { key: "melee", label: "Звук атаки (воин)" },
+    { key: "death", label: "Звук смерти юнита" },
+  ],
+  archer: [
+    { key: "bow", label: "Звук атаки (лучник)" },
+    { key: "death", label: "Звук смерти юнита" },
+  ],
+  enemy: [
+    { key: "melee", label: "Звук атаки (враг)" },
+    { key: "death", label: "Звук смерти юнита" },
+  ],
+  base: [
+    { key: "buildingBreak", label: "Звук разрушения (замок)" },
+    { key: "music", label: "Музыка на фоне" },
+  ],
+  enemyBase: [{ key: "buildingBreak", label: "Звук разрушения (вражеский замок)" }],
+  barracks: [{ key: "build", label: "Звук создания здания (казарма)" }],
+  tower: [
+    { key: "towerShot", label: "Звук выстрела башни" },
+    { key: "build", label: "Звук создания здания (башня)" },
+  ],
 };
 const world = document.getElementById("world");
 const camera = document.getElementById("camera");
@@ -99,15 +129,20 @@ const state = {
   isPaused: false,
   audioContext: null,
   sounds: {},
+  customSoundUrls: {},
+  soundSettings: loadSoundSettings(),
+  musicAudio: null,
   bestiary: loadBestiary(),
 };
 
 Object.entries(SOUND_DEFS).forEach(([key, def]) => {
+  if (!def.src) return;
   const audio = new Audio(def.src);
   audio.preload = "auto";
   audio.volume = def.volume;
   state.sounds[key] = audio;
 });
+loadCustomSounds();
 
 function loadBestiary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -125,10 +160,107 @@ function saveBestiary() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.bestiary));
 }
 
+function loadSoundSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SOUND_SETTINGS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSoundSettings() {
+  localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(state.soundSettings));
+}
+
+function openSoundDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(SOUND_DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(SOUND_DB_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function putSoundBlob(key, blob) {
+  const db = await openSoundDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SOUND_DB_STORE, "readwrite");
+    tx.objectStore(SOUND_DB_STORE).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getSoundBlob(key) {
+  const db = await openSoundDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SOUND_DB_STORE, "readonly");
+    const request = tx.objectStore(SOUND_DB_STORE).get(key);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteSoundBlob(key) {
+  const db = await openSoundDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SOUND_DB_STORE, "readwrite");
+    tx.objectStore(SOUND_DB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadCustomSounds() {
+  await Promise.all(Object.keys(state.soundSettings).map(async key => {
+    const blob = await getSoundBlob(key);
+    if (blob) setSoundFromBlob(key, blob);
+  }));
+}
+
+function setSoundFromBlob(key, blob) {
+  if (state.customSoundUrls[key]) URL.revokeObjectURL(state.customSoundUrls[key]);
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.preload = "auto";
+  audio.volume = SOUND_DEFS[key]?.volume ?? 0.6;
+  if (key === "music") audio.loop = true;
+  state.customSoundUrls[key] = url;
+  state.sounds[key] = audio;
+}
+
+async function saveCustomSound(key, file) {
+  await putSoundBlob(key, file);
+  state.soundSettings[key] = { fileName: file.name, type: file.type, size: file.size };
+  saveSoundSettings();
+  setSoundFromBlob(key, file);
+  if (key === "music" && screens.game && !screens.game.classList.contains("hidden")) playBackgroundMusic();
+}
+
+async function resetCustomSound(key) {
+  await deleteSoundBlob(key);
+  delete state.soundSettings[key];
+  saveSoundSettings();
+  if (state.customSoundUrls[key]) URL.revokeObjectURL(state.customSoundUrls[key]);
+  delete state.customSoundUrls[key];
+  if (key === "music") stopBackgroundMusic();
+  const def = SOUND_DEFS[key];
+  if (def?.src) {
+    const audio = new Audio(def.src);
+    audio.preload = "auto";
+    audio.volume = def.volume;
+    state.sounds[key] = audio;
+  } else {
+    delete state.sounds[key];
+  }
+}
+
 function showScreen(name) {
   Object.values(screens).forEach(screen => screen.classList.add("hidden"));
   screens[name].classList.remove("hidden");
   if (name === "bestiary") renderBestiary();
+  if (name === "game") playBackgroundMusic();
+  else stopBackgroundMusic();
 }
 
 function setMessage(text) {
@@ -150,6 +282,27 @@ function playSound(name, options = {}) {
       audio.currentTime = 0;
     }, duration * 1000);
   }
+}
+
+function playBackgroundMusic() {
+  const base = state.sounds.music;
+  if (!base) return;
+  if (state.musicAudio && state.musicAudio.src === base.src) {
+    state.musicAudio.play().catch(() => {});
+    return;
+  }
+  stopBackgroundMusic();
+  state.musicAudio = base.cloneNode();
+  state.musicAudio.loop = true;
+  state.musicAudio.volume = SOUND_DEFS.music.volume;
+  state.musicAudio.play().catch(() => {});
+}
+
+function stopBackgroundMusic() {
+  if (!state.musicAudio) return;
+  state.musicAudio.pause();
+  state.musicAudio.currentTime = 0;
+  state.musicAudio = null;
 }
 
 function flashDamaged(entity) {
@@ -239,8 +392,62 @@ function renderBestiary() {
       label.append(input);
       card.append(label);
     });
+    (UNIT_SOUND_CONTROLS[key] || []).forEach(control => {
+      card.append(createSoundControl(control.key, control.label));
+    });
     list.append(card);
   });
+}
+
+function createSoundControl(soundKey, labelText) {
+  const wrap = document.createElement("div");
+  wrap.className = "sound-control";
+  const title = document.createElement("div");
+  title.className = "sound-title";
+  title.textContent = labelText;
+  const status = document.createElement("div");
+  status.className = "sound-status";
+  status.textContent = state.soundSettings[soundKey]?.fileName || "Стандартный звук";
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "audio/*";
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    await saveCustomSound(soundKey, file);
+    renderBestiary();
+  });
+  const actions = document.createElement("div");
+  actions.className = "sound-actions";
+  const pick = document.createElement("button");
+  pick.type = "button";
+  pick.className = "secondary-btn small-btn";
+  pick.textContent = "Загрузить";
+  pick.addEventListener("click", () => input.click());
+  const test = document.createElement("button");
+  test.type = "button";
+  test.className = "secondary-btn small-btn";
+  test.textContent = "Прослушать";
+  test.disabled = soundKey === "music" && !state.sounds.music;
+  test.addEventListener("click", () => {
+    if (soundKey === "music") {
+      playBackgroundMusic();
+      return;
+    }
+    playSound(soundKey);
+  });
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "secondary-btn small-btn";
+  reset.textContent = "Сбросить";
+  reset.disabled = !state.soundSettings[soundKey];
+  reset.addEventListener("click", async () => {
+    await resetCustomSound(soundKey);
+    renderBestiary();
+  });
+  actions.append(pick, test, reset);
+  wrap.append(title, status, input, actions);
+  return wrap;
 }
 
 function worldBounds() {
@@ -1434,7 +1641,7 @@ function spawnAttackRing(x, y) {
 }
 
 function spawnArrow(from, to, options = {}) {
-  playBowShot();
+  playBowShot(options.tower || from.type === "towerShot" ? "towerShot" : "bow");
   const startX = from.x;
   const startY = from.type === "towerShot" ? from.y : from.y - (from.type === "base" || from.type === "tower" ? 64 : 14);
   const endX = to.x;
@@ -1458,8 +1665,8 @@ function spawnArrow(from, to, options = {}) {
   setTimeout(() => projectile.remove(), from.type === "archer" || from.enemyArcher ? 320 : 460);
 }
 
-function playBowShot() {
-  playSound("bow");
+function playBowShot(soundKey = "bow") {
+  playSound(soundKey);
 }
 
 function distributeMove(point) {
@@ -1821,8 +2028,9 @@ document.getElementById("exitBtn").addEventListener("click", () => {
   document.body.innerHTML = '<main class="screen menu-screen"><h1>Игра закрыта</h1><button class="primary-btn" onclick="location.reload()">Вернуться</button></main>';
 });
 
-document.getElementById("resetBestiaryBtn").addEventListener("click", () => {
+document.getElementById("resetBestiaryBtn").addEventListener("click", async () => {
   state.bestiary = structuredClone(BESTIARY_DEFAULTS);
+  await Promise.all(Object.keys(SOUND_DEFS).map(key => resetCustomSound(key)));
   saveBestiary();
   renderBestiary();
 });

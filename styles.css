@@ -204,6 +204,54 @@ button {
   background: #fff;
 }
 
+.sound-control {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sound-title {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.sound-status {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: rgba(36,48,63,0.06);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.sound-control input[type="file"] {
+  display: none;
+}
+
+.sound-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sound-actions .small-btn {
+  min-height: 32px;
+  padding-inline: 8px;
+  font-size: 12px;
+}
+
+.sound-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .game-screen {
   background:
     linear-gradient(rgba(118, 124, 121, 0.42), rgba(118, 124, 121, 0.42)),
