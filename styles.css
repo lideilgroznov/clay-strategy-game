@@ -952,19 +952,15 @@ button {
 }
 
 .construction {
-  width: 132px;
-  height: 92px;
-  border: 3px dashed rgba(79, 170, 104, 0.86);
-  border-radius: 15px;
-  background: rgba(79, 170, 104, 0.22);
+  width: 176px;
+  height: 146px;
+  border: 0;
+  border-radius: 0;
+  background: url("./assets/construction-base.png") center bottom / contain no-repeat;
 }
 
 .construction::before {
-  content: "";
-  position: absolute;
-  inset: 16px;
-  border-radius: 8px;
-  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 8px, rgba(255,255,255,0.18) 8px 16px);
+  display: none;
 }
 
 .range-circle {

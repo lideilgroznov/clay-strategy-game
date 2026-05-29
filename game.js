@@ -939,6 +939,22 @@ function startJob(owner, duration, onDone) {
   state.jobs.push({ owner, duration, elapsed: 0, progress, onDone });
 }
 
+function cancelConstruction(construction) {
+  if (!construction || construction.type !== "construction") return;
+  state.jobs = state.jobs.filter(job => {
+    const keep = job.owner !== construction;
+    if (!keep) job.progress.remove();
+    return keep;
+  });
+  if (construction.waitingBuilder) {
+    construction.waitingBuilder.busy = false;
+    construction.waitingBuilder.target = null;
+    construction.waitingBuilder.el?.classList.remove("busy");
+  }
+  construction.el.remove();
+  state.entities = state.entities.filter(entity => entity !== construction);
+}
+
 function startQueuedProduction(owner, duration, onDone, kind = "unit") {
   if (!owner.productionQueue) owner.productionQueue = [];
   owner.productionQueue.push({ duration, elapsed: 0, onDone, kind });
@@ -1430,6 +1446,10 @@ function updateCombat(dt) {
 
 function updateJobs(dt) {
   state.jobs.slice().forEach(job => {
+    if (job.owner?.type === "construction" && job.owner.waitingBuilder?.hp <= 0) {
+      cancelConstruction(job.owner);
+      return;
+    }
     job.elapsed += dt;
     const pct = Math.min(100, (job.elapsed / job.duration) * 100);
     const fill = job.progress.querySelector(".progress-fill");
@@ -1448,6 +1468,10 @@ function updateConstructionStarts() {
   state.entities.forEach(entity => {
     if (entity.type !== "construction" || !entity.pendingJob || entity.pendingJob.started) return;
     const builder = entity.waitingBuilder;
+    if (builder && (builder.hp <= 0 || !state.workers.includes(builder))) {
+      cancelConstruction(entity);
+      return;
+    }
     if (builder && distance(builder, { x: entity.x, y: entity.y + 58 }) > 12) return;
     entity.pendingJob.started = true;
     startJob(entity, entity.pendingJob.duration, entity.pendingJob.onDone);
@@ -1506,6 +1530,11 @@ function removeDead() {
   });
   [...state.workers, ...state.soldiers, ...state.archers].filter(unit => unit.hp <= 0).forEach(unit => {
     playSound("death");
+    if (unit.type === "worker") {
+      state.entities
+        .filter(entity => entity.type === "construction" && entity.waitingBuilder === unit)
+        .forEach(cancelConstruction);
+    }
     unit.el.remove();
     state.entities = state.entities.filter(entity => entity !== unit);
     state.workers = state.workers.filter(entity => entity !== unit);
